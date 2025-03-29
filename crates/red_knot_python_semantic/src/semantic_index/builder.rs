@@ -1467,8 +1467,14 @@ where
                         &case.pattern,
                         case.guard.as_deref(),
                     );
-                    if let Some(expr) = &case.guard {
-                        self.visit_expr(expr);
+                    if let Some(guard) = &case.guard {
+                        let guard_expr = self.add_standalone_expression(guard);
+                        self.visit_expr(guard);
+                        let predicate = Predicate {
+                            node: PredicateNode::Expression(guard_expr),
+                            is_positive: true,
+                        };
+                        self.record_narrowing_constraint(predicate);
                     }
                     self.visit_body(&case.body);
                     for id in &vis_constraints {
