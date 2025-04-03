@@ -385,6 +385,7 @@ impl<'db> UseDefMap<'db> {
 
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
     pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
+        tracing::debug!("evaluating visibility 1");
         !self
             .visibility_constraints
             .evaluate(db, &self.predicates, self.scope_start_visibility)

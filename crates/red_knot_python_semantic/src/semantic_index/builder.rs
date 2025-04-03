@@ -1295,6 +1295,7 @@ where
                     self.visit_body(clause_body);
 
                     for id in &vis_constraints {
+                        tracing::debug!("if: adding negation: {id:?}");
                         self.record_negated_visibility_constraint(*id);
                     }
                     if let Some(elif_predicate) = elif_predicate {
@@ -1446,22 +1447,29 @@ where
 
                 let subject_expr = self.add_standalone_expression(subject);
                 self.visit_expr(subject);
+
                 if cases.is_empty() {
                     return;
                 };
 
-                let after_subject = self.flow_snapshot();
+                let mut no_case_matched = self.flow_snapshot();
                 let mut vis_constraints = vec![];
                 let mut post_case_snapshots = vec![];
+                let mut last_predicate = None;
                 for (i, case) in cases.iter().enumerate() {
                     if i != 0 {
                         post_case_snapshots.push(self.flow_snapshot());
-                        self.flow_restore(after_subject.clone());
+                        self.flow_restore(no_case_matched.clone());
+
+                        if let Some(last_predicate) = last_predicate {
+                            self.record_negated_narrowing_constraint(last_predicate);
+                        }
                     }
 
                     self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
+                    no_case_matched = self.flow_snapshot();
                     let predicate = self.add_pattern_narrowing_constraint(
                         subject_expr,
                         &case.pattern,
@@ -1469,9 +1477,15 @@ where
                     );
                     if let Some(expr) = &case.guard {
                         self.visit_expr(expr);
+                        // If there's a guard we don't want to count this
+                        // TODO: actually account for guard constraints
+                        last_predicate = None;
+                    } else {
+                        last_predicate = Some(predicate);
                     }
                     self.visit_body(&case.body);
                     for id in &vis_constraints {
+                        tracing::debug!("match: adding negation: {id:?}");
                         self.record_negated_visibility_constraint(*id);
                     }
                     let vis_constraint_id = self.record_visibility_constraint(predicate);
@@ -1485,9 +1499,13 @@ where
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
                 {
                     post_case_snapshots.push(self.flow_snapshot());
-                    self.flow_restore(after_subject.clone());
+                    self.flow_restore(no_case_matched.clone());
+                    if let Some(last_predicate) = last_predicate {
+                        self.record_negated_narrowing_constraint(last_predicate);
+                    }
 
                     for id in &vis_constraints {
+                        tracing::debug!("match: adding negation: {id:?}");
                         self.record_negated_visibility_constraint(*id);
                     }
                 }
@@ -1496,7 +1514,7 @@ where
                     self.flow_merge(post_clause_state);
                 }
 
-                self.simplify_visibility_constraints(after_subject);
+                self.simplify_visibility_constraints(no_case_matched);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,

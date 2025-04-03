@@ -628,6 +628,7 @@ impl VisibilityConstraints {
     }
 
     fn analyze_single_pattern_predicate(db: &dyn Db, predicate: PatternPredicate) -> Truthiness {
+        tracing::debug!("analyze_single_pattern_predicate");
         let truthiness = Self::analyze_single_pattern_predicate_kind(
             db,
             predicate.kind(db),
@@ -646,10 +647,19 @@ impl VisibilityConstraints {
     fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
+                tracing::debug!("analyze_single_expr_predicate");
+                if !predicate.is_positive {
+                    tracing::debug!("found negative expr predicate");
+                }
                 let ty = infer_expression_type(db, test_expr);
                 ty.bool(db).negate_if(!predicate.is_positive)
             }
-            PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
+            PredicateNode::Pattern(inner) => {
+                if !predicate.is_positive {
+                    tracing::debug!("found negative predicate");
+                }
+                Self::analyze_single_pattern_predicate(db, inner).negate_if(!predicate.is_positive)
+            }
         }
     }
 }

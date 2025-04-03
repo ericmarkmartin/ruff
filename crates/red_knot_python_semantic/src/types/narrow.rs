@@ -48,7 +48,13 @@ pub(crate) fn infer_narrowing_constraint<'db>(
                 all_negative_narrowing_constraints_for_expression(db, expression)
             }
         }
-        PredicateNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern),
+        PredicateNode::Pattern(pattern) => {
+            if predicate.is_positive {
+                all_narrowing_constraints_for_pattern(db, pattern)
+            } else {
+                all_negative_narrowing_constraints_for_pattern(db, pattern)
+            }
+        }
     };
     if let Some(constraints) = constraints {
         constraints.get(&definition.symbol(db)).copied()
@@ -73,6 +79,15 @@ fn all_narrowing_constraints_for_expression<'db>(
     expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
     NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), true).finish()
+}
+
+#[allow(clippy::ref_option)]
+#[salsa::tracked(return_ref)]
+fn all_negative_narrowing_constraints_for_pattern<'db>(
+    db: &'db dyn Db,
+    pattern: PatternPredicate<'db>,
+) -> Option<NarrowingConstraints<'db>> {
+    NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), false).finish()
 }
 
 #[allow(clippy::ref_option)]
@@ -164,6 +179,13 @@ fn merge_constraints_or<'db>(
     }
 }
 
+fn negate<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db) {
+    tracing::debug!("negating constraints: {constraints:?}");
+    for (_, ty) in constraints.iter_mut() {
+        *ty = ty.negate(db);
+    }
+}
+
 struct NarrowingConstraintsBuilder<'db> {
     db: &'db dyn Db,
     predicate: PredicateNode<'db>,
@@ -184,7 +206,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             PredicateNode::Expression(expression) => {
                 self.evaluate_expression_predicate(expression, self.is_positive)
             }
-            PredicateNode::Pattern(pattern) => self.evaluate_pattern_predicate(pattern),
+            PredicateNode::Pattern(pattern) => {
+                self.evaluate_pattern_predicate(pattern, self.is_positive)
+            }
         };
         if let Some(mut constraints) = constraints {
             constraints.shrink_to_fit();
@@ -246,10 +270,17 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     fn evaluate_pattern_predicate(
         &mut self,
         pattern: PatternPredicate<'db>,
+        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = pattern.subject(self.db);
 
         self.evaluate_pattern_predicate_kind(pattern.kind(self.db), subject)
+            .map(|mut constraints| {
+                if !is_positive {
+                    negate(&mut constraints, self.db);
+                }
+                constraints
+            })
     }
 
     fn symbols(&self) -> Arc<SymbolTable> {
