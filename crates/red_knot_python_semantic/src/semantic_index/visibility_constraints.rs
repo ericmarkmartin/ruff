@@ -581,6 +581,8 @@ impl VisibilityConstraints {
 
                 debug_assert!(singleton_ty.is_singleton(db));
 
+                tracing::debug!("analyze_single_pattern_predicate_kind: {:?}", subject_ty);
+
                 if subject_ty.is_equivalent_to(db, singleton_ty) {
                     Truthiness::AlwaysTrue
                 } else if subject_ty.is_disjoint_from(db, singleton_ty) {

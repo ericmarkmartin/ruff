@@ -184,6 +184,7 @@ fn negate<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db) {
     for (_, ty) in constraints.iter_mut() {
         *ty = ty.negate(db);
     }
+    tracing::debug!("negated constraints: {constraints:?}");
 }
 
 struct NarrowingConstraintsBuilder<'db> {

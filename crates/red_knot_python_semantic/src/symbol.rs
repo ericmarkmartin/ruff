@@ -658,7 +658,6 @@ fn symbol_from_bindings_impl<'db>(
             visibility_constraint,
             narrowing_constraint: _,
         }) if binding.map_or(true, is_non_exported) => {
-            tracing::debug!("evaluating visbiility 2");
             visibility_constraints.evaluate(db, predicates, *visibility_constraint)
         }
         _ => Truthiness::AlwaysFalse,
@@ -676,7 +675,6 @@ fn symbol_from_bindings_impl<'db>(
                 return None;
             }
 
-            tracing::debug!("evaluating visbiility 3");
             let static_visibility =
                 visibility_constraints.evaluate(db, predicates, visibility_constraint);
 
@@ -750,7 +748,6 @@ fn symbol_from_declarations_impl<'db>(
             declaration,
             visibility_constraint,
         }) if declaration.map_or(true, is_non_exported) => {
-            tracing::debug!("evaluating visbiility 4");
             visibility_constraints.evaluate(db, predicates, *visibility_constraint)
         }
         _ => Truthiness::AlwaysFalse,
@@ -767,7 +764,6 @@ fn symbol_from_declarations_impl<'db>(
                 return None;
             }
 
-            tracing::debug!("evaluating visbiility 5");
             let static_visibility =
                 visibility_constraints.evaluate(db, predicates, visibility_constraint);
 

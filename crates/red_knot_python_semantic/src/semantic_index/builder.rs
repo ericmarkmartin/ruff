@@ -1273,7 +1273,10 @@ where
                     // if there's no `else` branch, we should add a no-op `else` branch
                     Some((None, Default::default()))
                 });
+                let mut i = 0;
                 for (clause_test, clause_body) in elif_else_clauses {
+                    tracing::debug!("elif/else: {i} / {clause_test:?}");
+                    i += 1;
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
                     post_clauses.push(self.flow_snapshot());
@@ -1303,6 +1306,13 @@ where
                         let id = self.record_visibility_constraint(elif_predicate);
                         vis_constraints.push(id);
                     }
+                }
+
+                if "/tmp/foo.py" == self.file.path(self.db).as_str() {
+                    tracing::debug!(
+                        "current constraints: {:?}",
+                        self.current_use_def_map().narrowing_constraints,
+                    );
                 }
 
                 for post_clause_state in post_clauses {
@@ -1462,6 +1472,7 @@ where
                         self.flow_restore(no_case_matched.clone());
 
                         if let Some(last_predicate) = last_predicate {
+                            tracing::debug!("last predicate: Some");
                             self.record_negated_narrowing_constraint(last_predicate);
                         }
                     }
@@ -1498,11 +1509,17 @@ where
                     .last()
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
                 {
+                    tracing::debug!("last case");
                     post_case_snapshots.push(self.flow_snapshot());
                     self.flow_restore(no_case_matched.clone());
                     if let Some(last_predicate) = last_predicate {
                         self.record_negated_narrowing_constraint(last_predicate);
                     }
+
+                    tracing::debug!(
+                        "current constraints: {:?} / ",
+                        self.current_use_def_map().narrowing_constraints,
+                    );
 
                     for id in &vis_constraints {
                         tracing::debug!("match: adding negation: {id:?}");
